@@ -26,6 +26,7 @@ public class Demo2 {
     double deadConfidence = 0.45;
     double confidence = 0.77;
     int machMethod = Imgproc.TM_CCOEFF_NORMED;
+    int threshold = 200;
 
     public static void main(String[] args) {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
@@ -79,18 +80,19 @@ public class Demo2 {
                     Mat frame = grabFrame();
                     // convert and show the frame
                     BufferedImage bufferedImage = matToBufferedImage(frame);
+                    changeImage(bufferedImage);
+                    Mat changedFrame = matify(bufferedImage);
                     int systemWidth = Toolkit.getDefaultToolkit().getScreenSize().width;
                     int systemHeight = Toolkit.getDefaultToolkit().getScreenSize().height;
                     int x = bufferedImage.getWidth() - bufferedImage.getWidth() / 5 - 40;
                     int y = bufferedImage.getHeight() - bufferedImage.getHeight() / 6;
                     int width = bufferedImage.getWidth() / 5 ;
                     int height = bufferedImage.getHeight() / 6;
-                    BufferedImage image = cropImage(bufferedImage, x, y, width, height);
                     Rect rect = new Rect(x, y, width, height);
-                    Mat cropped = new Mat(frame, rect);
+                    Mat cropped = new Mat(changedFrame, rect);
                     double rampageLMG = imageDetection(cropped, "rampageLMG", false);
                     System.out.println(rampageLMG);
-                    imageLabel.setIcon(new ImageIcon(matToBufferedImage(cropped)));
+                    imageLabel.setIcon(new ImageIcon(scaleImage(matToBufferedImage(cropped), 1000, 350)));
                     imageLabel.validate();
                     imageLabel.repaint();
 
@@ -123,7 +125,7 @@ public class Demo2 {
 
                 // if the frame is not empty, process it
                 if (!frame.empty()) {
-                    Imgproc.cvtColor(frame, frame, Imgproc.COLOR_BGR2GRAY);
+//                    Imgproc.cvtColor(frame, frame, Imgproc.COLOR_BGR2GRAY);
                 }
 
             } catch (Exception e) {
@@ -200,7 +202,7 @@ public class Demo2 {
             Mat outputImage = new Mat();
             Mat checkItemMat = Imgcodecs.imread( "/Users/lyl/Documents/GitHub/nosync.nosync/apex-opencv/src/main/resources/1080/" + checkItem +".png");
             if (!checkItemMat.empty()) {
-                Imgproc.cvtColor(checkItemMat, checkItemMat, Imgproc.COLOR_BGR2GRAY);
+//                Imgproc.cvtColor(checkItemMat, checkItemMat, Imgproc.COLOR_BGR2GRAY);
             }
             Imgproc.matchTemplate(_1weapon_2dead_3setting, checkItemMat, outputImage, machMethod);//
             Core.MinMaxLocResult confidenceValue = Core.minMaxLoc(outputImage);//find the max value and the location of the max value
@@ -230,5 +232,16 @@ public class Demo2 {
         byte[] data = ((DataBufferByte) sourceImg.getRaster().getDataBuffer()).getData();
         mat.put(0, 0, data);
         return mat;
+    }
+
+    public void changeImage(BufferedImage image) {
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int pixel = image.getRGB(x, y);
+                int grayValue = (pixel >> 16) & 0xff; // Extract the red component as the grayscale value
+                int newPixel = (grayValue > threshold) ? pixel : 0; // Set black for unwanted parts
+                image.setRGB(x, y, newPixel);
+            }
+        }
     }
 }
