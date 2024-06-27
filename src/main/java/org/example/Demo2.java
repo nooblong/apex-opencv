@@ -1,14 +1,17 @@
 package org.example;
 
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
+import org.opencv.core.*;
+import org.opencv.core.Point;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
+import java.awt.image.DataBufferInt;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -19,10 +22,16 @@ public class Demo2 {
     private static int cameraId = 0;
     private JLabel imageLabel = new JLabel();
     private JLabel imageLabelTotal = new JLabel();
+    private JLabel imageLabelMat = new JLabel();
+    double deadConfidence = 0.45;
+    double confidence = 0.77;
+    int machMethod = Imgproc.TM_CCOEFF_NORMED;
 
     public static void main(String[] args) {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
         Demo2 demo = new Demo2();
+        System.out.println(Toolkit.getDefaultToolkit().getScreenSize().getWidth());
+        System.out.println(Toolkit.getDefaultToolkit().getScreenSize().getHeight());
         demo.run();
     }
 
@@ -38,6 +47,7 @@ public class Demo2 {
         imageLabel.setVisible(false);
         imageLabelTotal.setHorizontalAlignment(JLabel.CENTER);
         imageLabelTotal.setVisible(false);
+        imageLabelMat.setVisible(false);
 
 
         // 创建一个按钮
@@ -47,6 +57,7 @@ public class Demo2 {
         // 将 JLabel 添加到 JFrame 中部
         frame.add(imageLabel, BorderLayout.CENTER);
         frame.add(imageLabelTotal, BorderLayout.WEST);
+        frame.add(imageLabelMat, BorderLayout.EAST);
 
         // 将按钮添加到 JFrame 底部
         frame.add(button, BorderLayout.SOUTH);
@@ -57,7 +68,6 @@ public class Demo2 {
 
     void startCamera() {
         if (imageLabel.isVisible()) {
-            imageLabel.setVisible(false);
             stopAcquisition();
         } else {
             imageLabel.setVisible(true);
@@ -73,10 +83,14 @@ public class Demo2 {
                     int systemHeight = Toolkit.getDefaultToolkit().getScreenSize().height;
                     int x = bufferedImage.getWidth() - bufferedImage.getWidth() / 5 - 40;
                     int y = bufferedImage.getHeight() - bufferedImage.getHeight() / 6;
-                    int width = bufferedImage.getWidth() / 5;
+                    int width = bufferedImage.getWidth() / 5 ;
                     int height = bufferedImage.getHeight() / 6;
                     BufferedImage image = cropImage(bufferedImage, x, y, width, height);
-                    imageLabel.setIcon(new ImageIcon(image));
+                    Rect rect = new Rect(x, y, width, height);
+                    Mat cropped = new Mat(frame, rect);
+                    double rampageLMG = imageDetection(cropped, "rampageLMG", false);
+                    System.out.println(rampageLMG);
+                    imageLabel.setIcon(new ImageIcon(matToBufferedImage(cropped)));
                     imageLabel.validate();
                     imageLabel.repaint();
 
@@ -84,6 +98,12 @@ public class Demo2 {
                     imageLabelTotal.setIcon(new ImageIcon(scaleImage(bufferedImage, 1000, 350)));
                     imageLabelTotal.validate();
                     imageLabelTotal.repaint();
+
+                    imageLabelMat.setVisible(true);
+                    Mat checkItemMat = Imgcodecs.imread( "/Users/lyl/Documents/GitHub/nosync.nosync/apex-opencv/src/main/resources/1080/" + "rampageLMG" +".png");
+                    imageLabelMat.setIcon(new ImageIcon(matToBufferedImage(checkItemMat)));
+                    imageLabelMat.validate();
+                    imageLabelMat.repaint();
                 }
             };
             this.timer = Executors.newSingleThreadScheduledExecutor();
@@ -173,5 +193,42 @@ public class Demo2 {
 
     private static BufferedImage cropImage(BufferedImage originalImage, int x, int y, int width, int height) {
         return originalImage.getSubimage(x, y, width, height);
+    }
+
+    public double imageDetection(Mat _1weapon_2dead_3setting, String checkItem, boolean debugVerbose) {
+        try {
+            Mat outputImage = new Mat();
+            Mat checkItemMat = Imgcodecs.imread( "/Users/lyl/Documents/GitHub/nosync.nosync/apex-opencv/src/main/resources/1080/" + checkItem +".png");
+            if (!checkItemMat.empty()) {
+                Imgproc.cvtColor(checkItemMat, checkItemMat, Imgproc.COLOR_BGR2GRAY);
+            }
+            Imgproc.matchTemplate(_1weapon_2dead_3setting, checkItemMat, outputImage, machMethod);//
+            Core.MinMaxLocResult confidenceValue = Core.minMaxLoc(outputImage);//find the max value and the location of the max value
+
+            Point matchLoc = confidenceValue.maxLoc;
+            Imgproc.rectangle(_1weapon_2dead_3setting, matchLoc,
+                    new Point(matchLoc.x + checkItemMat.cols(), matchLoc.y + checkItemMat.rows()), new Scalar(0, 255, 0));
+
+            if (debugVerbose) {
+                System.out.println("checkItem: " + checkItem);
+                System.out.println("screenshot: " +_1weapon_2dead_3setting);
+//                System.out.println("screenResolution: " + screenResolution);
+                System.out.println("confidenceValue.maxVal = " + confidenceValue.maxVal);
+                // out
+            }
+            return confidenceValue.maxVal;
+        } catch (Exception e) {
+            // output error message to ui
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Error: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    public Mat matify(BufferedImage sourceImg) {
+        Mat mat = new Mat(sourceImg.getHeight(), sourceImg.getWidth(), CvType.CV_8UC3);
+        byte[] data = ((DataBufferByte) sourceImg.getRaster().getDataBuffer()).getData();
+        mat.put(0, 0, data);
+        return mat;
     }
 }
